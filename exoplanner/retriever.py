@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 import astropy.units as u
 import astropy.constants as c
 import astropy.io.fits as fits
-import multiprocessing as mp
 
 from astropy.time import Time
 from skimage import registration
@@ -859,7 +858,7 @@ class Retriever:
         
         sampler_func = getattr(sampler, "MCMC")
         
-        num_threads = mp.cpu_count()
+        num_threads = os.cpu_count()
         
         mcmc_sampler = sampler_func(sys, self.configs['num_temps'],self.configs['num_walkers'],num_threads)
         
