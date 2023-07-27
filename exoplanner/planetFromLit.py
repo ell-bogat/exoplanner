@@ -5,7 +5,6 @@ import astropy.units as u
 import astropy.constants as c
 from astropy.coordinates import SkyCoord
 from scipy.stats import norm
-import os
 
 from .planetABC import PlanetABC
 from .planetModel import PlanetModel

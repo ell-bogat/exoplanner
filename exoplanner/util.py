@@ -2,10 +2,6 @@ import numpy as np
 import os
 import pandas as pd
 pd.options.mode.chained_assignment = None
-import csv
-import json
-import random
-from IPython.display import display
 import exoscene
 
 import matplotlib as mpl
@@ -17,7 +13,6 @@ mpl.rcParams['image.origin'] = 'lower'
 seafoam = '#dbfeff'
 
 import astropy.units as u
-import astropy.constants as c
 
 
 def plot_phase_track(planet_list, astrom_eps=None, returned_astrom_eps=None,showplots=None,contrast=False,show_pm=True,title=None):

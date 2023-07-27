@@ -8,7 +8,6 @@ import exoscene.star
 import scipy
 import astropy.io.fits as fits
 import matplotlib.pyplot as plt
-from IPython.core.display import display
 
 class Observatory:
     """

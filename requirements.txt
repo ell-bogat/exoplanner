@@ -1,0 +1,10 @@
+numpy
+pandas
+astropy
+exoscene
+scipy
+matplotlib
+csv
+orbitize
+skimage
+multiprocessing
