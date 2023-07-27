@@ -3,7 +3,6 @@ import pandas as pd
 import warnings
 import os
 import datetime
-import csv
 
 import astropy
 import astropy.units as u
@@ -263,10 +262,9 @@ class PlanetModel(planetABC.PlanetABC):
 
             exoscene.planet.write_ephem_table(self.model, tarray = t_series, table_fname = table_fname_temp)    
 
-            with open(table_fname_temp, 'r') as f:
-                reader = csv.reader(f, delimiter=',')
-                headers = next(reader)
-                data = list(reader)    
+            arr = np.loadtxt(table_fname_temp,dtype=str,delimiter=',')
+            headers = arr[0]
+            data = arr[1:]    
             
             headers = ['t_yr','deltax_mas','deltay_mas','phase','r_AU','fluxratio_575']
             
@@ -300,10 +298,10 @@ class PlanetModel(planetABC.PlanetABC):
             exoscene.planet.write_ephem_table(self.model, tbeg = t0, tend = t0 + t_span,
                                               tstep = t_step, table_fname = table_fname_temp)
 
-            with open(table_fname_temp, 'r') as f:
-                reader = csv.reader(f, delimiter=',')
-                headers = next(reader)
-                data = list(reader)    
+            
+            arr = np.loadtxt(table_fname_temp,dtype=str,delimiter=',')
+            headers = arr[0]
+            data = arr[1:]
             
             headers = ['t_yr','deltax_mas','deltay_mas','phase','r_AU','fluxratio_575']
             
