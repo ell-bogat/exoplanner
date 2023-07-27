@@ -5,5 +5,4 @@ astropy
 exoscene
 scipy
 matplotlib
-skimage
-multiprocessing
+scikit-image
