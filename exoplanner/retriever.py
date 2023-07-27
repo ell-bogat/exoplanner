@@ -16,7 +16,6 @@ import astropy.constants as c
 import astropy.io.fits as fits
 import multiprocessing as mp
 
-from scipy.stats import norm
 from astropy.time import Time
 from skimage import registration
 from orbitize.system import radec2seppa, seppa2radec
