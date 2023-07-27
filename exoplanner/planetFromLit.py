@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 import warnings
 import astropy.units as u
-import astropy.constants as c
-from astropy.coordinates import SkyCoord
 from scipy.stats import norm
 
 from .planetABC import PlanetABC

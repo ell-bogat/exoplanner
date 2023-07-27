@@ -3,15 +3,8 @@ import os
 import pkg_resources
 import pandas as pd
 pd.options.mode.chained_assignment = None
-import csv
-import json
-import random
-import IPython.core.display as ICD
-import pyvo as vo
-import math
 import datetime
 import multiprocessing as mp
-import photutils
 import copy
 dcopy = copy.deepcopy 
 
@@ -33,11 +26,8 @@ matplotlib.rcParams['image.origin'] = 'lower'
 
 import astropy.units as u
 import astropy.constants as c
-from astropy.coordinates import SkyCoord
 import astropy.io.fits as fits
 import astropy.table
-from astropy.io import ascii
-from astropy.table import QTable, Column
 from astropy.utils.exceptions import AstropyWarning
 Time = astropy.time.Time
 import warnings
@@ -46,14 +36,10 @@ warnings.simplefilter('ignore', category=AstropyWarning)
 import orbitize
 from orbitize import driver
 from orbitize.system import radec2seppa, seppa2radec
-from orbitize.basis import t0_to_tau
 import orbitize.kepler as kepler
 
 import exoscene
-from exoscene import planet
 from exoscene.planet import Planet
-from exoscene import star
-from exoscene import image
 
 seafoam = '#dbfeff'
 
@@ -588,8 +574,6 @@ def retrieve_astrom(sys_d,version,pl_list,system_name,sys_dir,cal_data_dir,SNR,p
     seps = np.round(astrom_df.sep_mas,-1)
     astrom_df['uncertainty_mas'] = [astrom_uncertainty.loc[sep,'meds'] + astrom_uncertainty.loc[sep,'stds'] for sep in seps ]
     
-    if show_plots:
-        ICD.display(astrom_df)
     astrom_data_fname = system_name + f'_retrieved_astrometry_PoissonNoise{poisson_noise}_SNR{SNR}_v{version}.csv'
     astrom_df.to_csv(os.path.join(sys_dir,astrom_data_fname))
     
@@ -631,7 +615,6 @@ def retrieve_astrom(sys_d,version,pl_list,system_name,sys_dir,cal_data_dir,SNR,p
         print("ASTROMETRY TRUTH FILE IS MISSING!")
         return np.nan
     
-    #ICD.display(astrom_truth_df)
     
     # Get returned astrometry data
     astrom_returned_path = os.path.join(sys_dir,system_name + f'_retrieved_astrometry_PoissonNoise{poisson_noise}_SNR{SNR}_v{version}.csv') 
@@ -653,10 +636,7 @@ def retrieve_astrom(sys_d,version,pl_list,system_name,sys_dir,cal_data_dir,SNR,p
     sep_mas_true , pa_deg_true = radec2seppa(astrom_returned_df['ra_mas_true'],astrom_returned_df['dec_mas_true'])
     astrom_returned_df['sep_mas_true'] = sep_mas_true
     astrom_returned_df['pa_deg_true'] = pa_deg_true
-    
-    if show_plots:
-        ICD.display(astrom_returned_df)
-                    
+                        
     err_mas = np.sqrt((astrom_returned_df.ra_mas - astrom_returned_df.ra_mas_true) ** 2 + (astrom_returned_df.dec_mas - astrom_returned_df.dec_mas_true) ** 2)
     astrom_returned_df['astrom_err_mas'] = err_mas
     
@@ -765,10 +745,6 @@ def retrieve_orbit(sys_d,version,pl_list,system_name,sys_dir,rvdict,SNR,poisson_
                 rv_orbitize_table.add_column(rv_quant2_col, index = 4)
                 rv_orbitize_table.add_column(rv_quant2_err_col, index = 5)
                 rv_orbitize_table.add_column(rv_quant_type_col, index = 6)
-
-                '''if show_plots:
-                    print('\t\tRV data:')
-                    ICD.display(rv_orbitize_table)'''
 
                 if fit_rel_astrom:
                     # Combine with astrometry data
@@ -987,9 +963,6 @@ def retrieve_orbit(sys_d,version,pl_list,system_name,sys_dir,rvdict,SNR,poisson_
 
             # Convert inc to deg
             df_run.inc1 = np.rad2deg(df_run.inc1)
-
-            if show_plots:
-                ICD.display(df_run)
                 
             df_run['version'] = version
 
@@ -1034,9 +1007,6 @@ def retrieve_orbit(sys_d,version,pl_list,system_name,sys_dir,rvdict,SNR,poisson_
 
     # Make input data table according to parameters above
     orbitize_input_table = make_input_table()
-    if show_plots:
-        print("Orbitize input table:")
-        ICD.display(orbitize_input_table)
 
     # Run the MCMC algorithm using the settings above
     t_0 = datetime.datetime.now() # Record time at beginning 
@@ -1117,7 +1087,6 @@ def explore_orbitize_results(sys_d, version,pl_list, system_name, sys_dir, rvdic
 
             # Get the input data for one planet:
             pl_df = orbitize_input_df.loc[pp+1,:].copy()
-            #ICD.display(pl_df)
 
             # Calculate planet ra/dec from the sep/pa
             ra_true = np.array(pl_df.quant1) * np.sin(np.radians(pl_df.quant2))
@@ -1191,8 +1160,6 @@ def explore_orbitize_results(sys_d, version,pl_list, system_name, sys_dir, rvdic
         rv_df = orbitize_input_df.loc[0].copy()
         rv_df.reset_index(inplace=True)
         rv_df.columns = ['epoch_mjd','rv','err','q2','q2err','qtype']
-        if show_plots:
-            display(rv_df)
         rv_df.loc[:,'epoch_yr'] = Time(rv_df.epoch_mjd,format='mjd').decimalyear
         ax1.scatter(rv_df.epoch_yr,rv_df.rv,marker='x',c='k',label='rv data',zorder = 5,linewidths=1)
         #ax1.errorbar(rv_df.epoch_yr,rv_df.rv,yerr=rv_df.err,zorder=5,color='k',label='rv data',fmt='none',elinewitdh=1)
@@ -1345,8 +1312,6 @@ def explore_orbitize_results(sys_d, version,pl_list, system_name, sys_dir, rvdic
 
             run_df = pd.DataFrame.from_dict(res_dict)
             run_df.set_index('quantile',inplace=True)
-            if show_plots:
-                ICD.display(run_df)
 
             # Examine chains
 
@@ -1536,18 +1501,13 @@ def explore_orbitize_results(sys_d, version,pl_list, system_name, sys_dir, rvdic
                 if fit_rel_astrom:
                     # Iterate through planets
                     print('Planets:',planets)
-                    if show_plots:
-                        #display(orbitize_input_df)
-                        pass
+
                     for pp in planets:
 
                         # Get the input data for one planet:
                         pl_df = orbitize_input_df.loc[pp,:].copy()
                         pl_df.reset_index(inplace=True)
-                        if show_plots:
-                            #ICD.display(pl_df)
-                            pass
-
+ 
                         # Calculate planet ra/dec from the sep/pa
                         ra_true = np.array(pl_df.quant1) * np.sin(np.radians(pl_df.quant2))
                         dc_true = np.array(pl_df.quant1) * np.cos(np.radians(pl_df.quant2))
@@ -1618,9 +1578,6 @@ def explore_orbitize_results(sys_d, version,pl_list, system_name, sys_dir, rvdic
 
         # Save results
         #filetag_temp = f'_NumSteps{num_steps}_BurnIn{b_in}_RVFit{joint_RV_fit}_RelAstromFit{fit_rel_astrom}_PNoise{Poisson_Noise}_MassPriorGaussian'
-
-        if show_plots:
-            ICD.display(run_df)
             
         fpath = os.path.join(sys_dir,f'final_orbitize_results_df{filetag}_v{version}.csv')   
         print('\tSaving run summary to',fpath)
@@ -1718,15 +1675,10 @@ def explore_orbitize_results(sys_d, version,pl_list, system_name, sys_dir, rvdic
     if os.path.exists(orbitize_input_table_filename):
         orbitize_input_df = pd.read_csv(orbitize_input_table_filename)    
         orbitize_input_df.set_index(['object','epoch'],inplace=True)
-        #print('\tOrbitize input dataframe:')
-        #ICD.display(orbitize_input_df)
 
         # Load results dataframe
         results_df = pd.read_csv(os.path.join(sys_dir,f'orbitize_results{filetag}_v{version}.csv'))
         results_df.set_index('quantile',inplace=True)
-        if show_plots:
-            print('\tOrbitize results table:')
-            ICD.display(results_df)
 
         # Load orbitize results object
         results = orbitize.results.Results()

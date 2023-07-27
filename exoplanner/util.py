@@ -232,8 +232,6 @@ def summarize_fits(res_dir,verbose=False):
         df = pd.read_csv(csv)
         df['run_ID'] = count
         df.set_index(['run_ID','star','pl_letter','inc','quantile'],inplace=True) #,'version'
-        if verbose:
-            ICD.display(df)
         count += 1
 
         if init_flag:

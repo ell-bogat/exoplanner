@@ -20,8 +20,6 @@ from scipy.stats import norm
 from astropy.time import Time
 from skimage import registration
 from orbitize.system import radec2seppa, seppa2radec
-from astropy.coordinates import SkyCoord
-from IPython.core.display import display
 from orbitize import sampler
 
 warnings.simplefilter(action='ignore',category=UserWarning)
@@ -573,9 +571,6 @@ class Retriever:
         
         astrom_df.set_index('t_yr',inplace=True)
 
-        if showplots:
-            display(astrom_df)
-
         astrom_data_fname = f'retrieved_astrometry.csv'
         
         astrom_df.to_csv(os.path.join(planet.planet_dir,astrom_data_fname))
@@ -720,9 +715,6 @@ class Retriever:
                                                  file_type = 'csv'
                                                  )
         
-        if self.configs['showplots']:
-            print("Orbitize input table:")
-            display(orbitize_input_table)
 
         # Run the MCMC algorithm using the settings above
         t_0 = datetime.datetime.now() # Record time at beginning 
@@ -949,9 +941,6 @@ class Retriever:
 
             # Convert inc to deg
             df_run.inc1 = np.rad2deg(df_run.inc1)
-
-            if self.configs['showplots']:
-                display(df_run)
 
             # Save results
             print('\tSaving results object and DF summary')
