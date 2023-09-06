@@ -74,21 +74,34 @@ class PlanetABC:
         if self.ecc_prior_uniform is None:
             self.ecc_prior_uniform = True if self.sysname in self.configs['ecc_prior_uniform'] else False
         
-        if type(input_df) is pd.core.frame.DataFrame:
+        if not input_df is None:
             row = input_df.loc[(st_name,pl_letter),:]
             
             self.det_type = row['discoverymethod'] # 'Radial Velocity' or 'Direct Imaging'
             
-            self.st_sptype = row['st_spectype']
-            self.st_Vmag = row['sy_vmag']
-            self.st_Vmag_err = [row['sy_vmagerr1'], np.absolute(row['sy_vmagerr2'])]
-            self.plx = row['sy_plx'] * u.mas
-            self.plx_err = [row['sy_plxerr1'], np.absolute(row['sy_plxerr2'])] * u.mas
+            self.st_sptype = row['SP_TYPE'] if not row['SP_TYPE']=='' else row['st_spectype']
+            
+            if not np.isnan(row['FLUX_V']):
+                self.st_Vmag = row['FLUX_V'] 
+                self.st_Vmag_err = [row['FLUX_ERROR_V'], np.absolute(row['FLUX_ERROR_V'])]
+            else:
+                self.st_Vmag = row['sy_vmag']
+                self.st_Vmag_err = [row['sy_vmagerr1'], np.absolute(row['sy_vmagerr2'])]
+
+            if not np.isnan(row['PLX_VALUE']):
+                self.plx = row['PLX_VALUE'] * u.mas
+                self.plx_err = [row['PLX_ERROR'], np.absolute(row['PLX_ERROR'])] * u.mas
+            else:
+                self.plx = row['sy_plx']  * u.mas
+                self.plx_err = [row['sy_plxerr1'], np.absolute(row['sy_plxerr2'])] * u.mas
+
+            # TO DO: Make system distance dependent on whether parallax is provided
             self.dist = row['sy_dist'] * u.pc
             self.dist_err = [row['sy_disterr1'], np.absolute(row['sy_disterr2'])] * u.pc
+
             self.st_mass = row['st_mass'] * c.M_sun
             self.st_mass_err = [row['st_masserr1'], np.absolute(row['st_masserr2'])] * c.M_sun
-            self.st_loc = [row['st_ra_icrs'],row['st_dec_icrs']] # RA: hms, Dec: dms
+            self.st_loc = [row['RA'],row['DEC']] # RA: hms, Dec: dms
             
             self.sma = row['pl_orbsmax'] * u.au
             self.sma_err = [row['pl_orbsmaxerr1'], np.absolute(row['pl_orbsmaxerr2'])] * u.au
@@ -137,7 +150,7 @@ class PlanetABC:
             self.pl_msini_err = pl_msini_err
             self.pl_rad = pl_rad
             self.pl_rad_err = pl_rad_err
-            
+          
         # Pull self-luminosity data from config file
         if self.self_lum == 0.0 and (self.sysname in self.configs['self_luminosity']):
             self.self_lum = self.configs['self_luminosity'][self.sysname]
