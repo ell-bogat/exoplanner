@@ -79,7 +79,7 @@ class PlanetABC:
             
             self.det_type = row['discoverymethod'] # 'Radial Velocity' or 'Direct Imaging'
             
-            self.st_sptype = row['SP_TYPE'] if not row['SP_TYPE']=='' else row['st_spectype']
+            self.st_sptype = row['SP_TYPE_EXOSCENE']
             
             if not np.isnan(row['FLUX_V']):
                 self.st_Vmag = row['FLUX_V'] 
