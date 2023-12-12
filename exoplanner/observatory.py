@@ -348,7 +348,7 @@ class Observatory:
         ## Display the planet PSF scene at several time samples, in flux ratio units, and save to fits
 
         # Generate noiseless tseries images with 10 hours of integration time
-        planet_scene_series_10_hr = make_time_series_images(planet.observation_epochs,int_ts=[10*u.hour]) #,p_noise=False
+        planet_scene_series_10_hr = make_time_series_images(planet.observation_epochs,int_ts=[10*u.hour],p_noise=False) #
 
         ### Calculate int time needed to get 200 photons in 3x3 grid around peak
 
@@ -377,8 +377,18 @@ class Observatory:
             num_photons = np.nansum(src_cutout.flatten())
             
             # Calculate the new integration time, capped at 1000 hours
-            new_int_time = (10 * u.hour) * (self.snr_goal**2 * u.photon)/ num_photons  if num_photons > 0 else (0 * u.hour)
+            #if num_photons <= 0:
+            #    raise Warning("<0 photons detected in a 3x3 box around the source!")
             
+            new_int_time = (10 * (self.snr_goal**2 * u.photon)/ num_photons).to(u.hour)  if num_photons > 0 else (1000 * u.hour)
+            new_int_time = np.min([new_int_time.value,1000]) * u.hour
+
+            if new_int_time.value > 1000:
+                raise ValueError("Integration time > 1000 hours!")
+            
+            #new_int_t = (10 * (self.snr_goal**2 * u.photon)/ num_photons).to(u.hour)
+            #new_int_time = np.min([new_int_t.value, 1000] ) * u.hour
+
             int_times.append(new_int_time)
 
         planet_scene_series = make_time_series_images(planet.observation_epochs,int_ts=int_times)
