@@ -118,7 +118,8 @@ class PlanetModel(planetABC.PlanetABC):
         if np.isnan(self.pl_mass):
             mass = self.pl_msini / np.sin(np.deg2rad(self.inc))
             if mass > mass_max:
-                warnings.warn(f'{self.sysname} at inclination {self.inc} is a star ({mass} M_Jup). Skipping this inclination.')
+                print(f'WARNING: {self.sysname} at inclination {self.inc} is a star ({mass}). Skipping this inclination.')
+                self.is_star = True
                 return None
             else:
                 self.pl_mass = mass

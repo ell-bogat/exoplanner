@@ -113,8 +113,9 @@ class PlanetFromLit(PlanetABC):
                              ecc_prior_uniform=self.ecc_prior_uniform)
         
         planet.ret = self.ret
-        
-        self.planet_list.append(planet)
+
+        if not planet.is_star:
+            self.planet_list.append(planet)
         
     ########################################################################################################################
         
@@ -154,7 +155,9 @@ class PlanetFromLit(PlanetABC):
                 self.add_planet(inc=inc)
         
         else:
-            raise ValueError("param_list only configured for ['inc'] or None.")       
+            raise ValueError("param_list only configured for ['inc'] or None.") 
+
+
             
     ########################################################################################################################
             

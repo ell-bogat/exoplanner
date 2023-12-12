@@ -44,6 +44,9 @@ class PlanetABC:
         self.sysname = f"{st_name} {pl_letter}"
         self.st_name = st_name
         self.pl_letter = pl_letter
+
+        # Star flag
+        self.is_star = False
         
         # Directory setup
         self.results_dir = os.path.join(*configs['results_dir'])
