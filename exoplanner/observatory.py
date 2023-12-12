@@ -75,21 +75,21 @@ class Observatory:
         ## Load CGI PSF model
         hlc_psf_path =  pkg_resources.resource_filename('exoscene', 'data/cgi_hlc_psf')
         
-        psf_cube_fname = os.path.join(hlc_psf_path, 'os9_psfs.fits')
+        psf_cube_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_oversampled.fits')
         
-        psf_r_fname = os.path.join(hlc_psf_path, 'os9_psfs_r_offset.fits')
+        psf_r_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_radial_offsets.fits')
         
-        psf_angle_fname = os.path.join(hlc_psf_path, 'os9_psfs_angle_offset.fits')
+        psf_angle_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_azimuth_offsets.fits')
 
         psf_cube = fits.getdata(psf_cube_fname)
         
         psf_hdr = fits.getheader(psf_cube_fname)
         
-        #print(f"\tShape of PSF model: {psf_cube.shape}")
+        print(f"\tShape of PSF model: {psf_cube.shape}")
 
-        self.hires_pixscale_as = psf_hdr['PIX_AS'] * u.arcsec
+        self.hires_pixscale_as = psf_hdr['PIXAS'] * u.arcsec
         
-        hires_pixscale_LoD = psf_hdr['PIXSCALE']
+        hires_pixscale_LoD = psf_hdr['PIXLAMD']
 
         data_scale_fac = self.hires_pixscale_as.value / self.data_pixscale_as.value
         
@@ -97,11 +97,14 @@ class Observatory:
         
         #print("\tCCD pixel to model pixel scale factor = {:.3f}".format(data_scale_fac))
 
-        r_offsets_LoD = fits.getdata(psf_r_fname)[0, :]
+        #print(f'data shape psf_r_fname: {fits.getdata(psf_r_fname).shape}')
+        #print(f'data shape psf_angle_fname: {fits.getdata(psf_angle_fname).shape}')
+
+        r_offsets_LoD = fits.getdata(psf_r_fname)
         
         self.r_offsets_as = r_offsets_LoD * self.hires_pixscale_as / hires_pixscale_LoD
         
-        self.angles = fits.getdata(psf_angle_fname)[:, 0]
+        self.angles = fits.getdata(psf_angle_fname)
 
         Np_psf_hires = psf_cube.shape[-1]
 
@@ -127,7 +130,7 @@ class Observatory:
         self.npad = 8 # pad before and after array edge before binning
 
         self.max_detect_width = 1.1 * u.arcsec
-        test_hires_psf = exoscene.image.get_hires_psf_at_xy_os9(
+        test_hires_psf = exoscene.image.get_hires_psf_at_xy_os11(
                 self.offset_psfs,
                 self.r_offsets_as.value, self.angles,
                 self.hires_pixscale_as.value,
@@ -200,8 +203,7 @@ class Observatory:
                 binfac = 10, conserve = 'sum')
 
         ## Compute star PSF peak countrate based on collecting area and throughput
-        minlam = (psf_hdr['minlam'] * u.micron).to(u.nanometer)
-        maxlam = (psf_hdr['maxlam'] * u.micron).to(u.nanometer)
+        minlam, maxlam = psf_hdr['LAM_C_NM'] * u.nanometer * np.array([0.95,1.05])
         
         #print(f"Min lambda: {minlam}")
         #print(f"Max lambda: {maxlam}")
@@ -291,7 +293,7 @@ class Observatory:
                 flux_ratio = ephem_df['fluxratio_575'].iloc[t_ephem]
 
                 # Get noiseless planet PSF at epochs, units: flux ratio
-                planet_psf = exoscene.image.get_hires_psf_at_xy_os9(
+                planet_psf = exoscene.image.get_hires_psf_at_xy_os11(
                          self.offset_psfs, self.r_offsets_as.value, self.angles,
                          self.hires_pixscale_as.value, deltax_as, deltay_as, self.cx)
 
