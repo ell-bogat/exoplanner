@@ -413,7 +413,7 @@ class Observatory:
             if showplots:
             
                 plt.figure(figsize = (8,6))
-                plt.imshow(data,extent=(42,0,0,42)) # ,extent=(99,0,0,99)
+                plt.imshow(data.value,extent=(42,0,0,42)) # ,extent=(99,0,0,99)
 
                 xtick_locs = (np.arange(1, -1, -0.2) / self.data_pixscale_as.value
                               + (self.imwidth - 2 * crop) // 2)
