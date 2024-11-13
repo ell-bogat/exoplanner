@@ -3,9 +3,7 @@ import astropy.units as u
 import pkg_resources
 import os
 import exoscene
-import exoscene.image
-import exoscene.star
-import scipy
+from skimage.transform import downscale_local_mean
 import astropy.io.fits as fits
 import matplotlib.pyplot as plt
 
@@ -69,155 +67,141 @@ class Observatory:
             self.n_epochs_goal = n_epochs_goal
             self.t_span_pm = t_span_pm.to(u.year)
             self.t0_pm = t0_pm.to(u.year)
+
+    def downsample_hires_model(self,hires_psf):
+        
+        # Do simple scipy binning if possible
+        if self.hires_scale_fac == np.round(self.hires_scale_fac):
+
+            print(f'Hi res scale factor is simple integer: {self.hires_scale_fac}')
+
+            binned_psf = downscale_local_mean(hires_psf, int(self.hires_scale_fac)) * self.hires_scale_fac**2
+
+            xcoord_psf = ((np.arange(hires_psf.shape[0]) - self.cx)
+                        * self.hires_pixscale_as)
             
-    def test_psf(self,target):
-    
-        ## Load CGI PSF model
-        hlc_psf_path =  pkg_resources.resource_filename('exoscene', 'data/cgi_hlc_psf')
+            ycoord_psf = xcoord_psf.copy()
+            
+            det_xcoord = xcoord_psf / self.hires_scale_fac
         
-        psf_cube_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_oversampled.fits')
+            det_ycoord = ycoord_psf / self.hires_scale_fac
         
-        psf_r_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_radial_offsets.fits')
+        else:
+            max_detect_width = 1.1 * u.arcsec
         
-        psf_angle_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_azimuth_offsets.fits')
+            # Get scene array dimensions and data mask
+            padded_test_hires_psf = np.pad(hires_psf,
+                                    ((self.npad, self.npad), (self.npad,self.npad)),
+                                    mode='constant')
 
-        psf_cube = fits.getdata(psf_cube_fname)
-        
-        psf_hdr = fits.getheader(psf_cube_fname)
-        
-        print(f"\tShape of PSF model: {psf_cube.shape}")
+            cx_padded = padded_test_hires_psf.shape[0] // 2 
 
-        self.hires_pixscale_as = psf_hdr['PIXAS'] * u.arcsec
-        
-        hires_pixscale_LoD = psf_hdr['PIXLAMD']
+            xcoord_psf = ((np.arange(padded_test_hires_psf.shape[0]) - cx_padded)
+                        * self.hires_pixscale_as)
+            
+            ycoord_psf = xcoord_psf.copy()
 
-        data_scale_fac = self.hires_pixscale_as.value / self.data_pixscale_as.value
-        
-        self.data_pixscale_LoD = hires_pixscale_LoD / data_scale_fac
-        
-        #print("\tCCD pixel to model pixel scale factor = {:.3f}".format(data_scale_fac))
+            binned_psf, det_xcoord, det_ycoord = exoscene.image.resample_image_array(
+                    padded_test_hires_psf, self.hires_pixscale_as,
+                    img_xcoord = xcoord_psf, img_ycoord = ycoord_psf,
+                    det_pixscale = self.data_pixscale_as,
+                    det_width = max_detect_width,
+                    binfac = 10, conserve = 'sum')
 
-        #print(f'data shape psf_r_fname: {fits.getdata(psf_r_fname).shape}')
-        #print(f'data shape psf_angle_fname: {fits.getdata(psf_angle_fname).shape}')
+            #print(f"\t{padded_test_hires_psf.shape}")
+            #print(f"\t{binned_test_psf.shape}")
+            
+        self.imwidth = binned_psf.shape[-1]
 
-        r_offsets_LoD = fits.getdata(psf_r_fname)
-        
-        self.r_offsets_as = r_offsets_LoD * self.hires_pixscale_as / hires_pixscale_LoD
-        
-        self.angles = fits.getdata(psf_angle_fname)
-
-        Np_psf_hires = psf_cube.shape[-1]
-
-        # Show radial offsets and position angles present in the PSF model cube
-        
-        #print("\n\tPSF model radial offsets (lam/D):\n\t\t{:}".format(r_offsets_LoD))
-        #print("\tPSF model position angles (deg):\n\t\t{:}".format(self.angles))
-
-        # Apply half-pixel shift to place center at 99.5, 99.5
-        
-        self.offset_psfs = scipy.ndimage.interpolation.shift(psf_cube, (0, 0, -0.5, -0.5),
-                                                        order = 1, prefilter=False,
-                                                        mode = 'constant', cval=0)
-        Np = self.offset_psfs.shape[-1]
-        
-        self.cx = Np // 2 - 0.5 # New array center in zero-based indices
-
-        #print("\tDimensions of PSF model cube: {:}".format(self.offset_psfs.shape))
-        #print("\tNew array center along both axes: {:.1f}".format(self.cx))    
-
-        ## Set detector downsample parameters and test an example
-
-        self.npad = 8 # pad before and after array edge before binning
-
-        self.max_detect_width = 1.1 * u.arcsec
-        test_hires_psf = exoscene.image.get_hires_psf_at_xy_os11(
-                self.offset_psfs,
-                self.r_offsets_as.value, self.angles,
-                self.hires_pixscale_as.value,
-                delx_as = (-0.1 * u.arcsec).value,
-                dely_as = (0.2 * u.arcsec).value,
-                cx = self.cx)
-
-        # Get scene array dimensions and data mask
-        padded_test_hires_psf = np.pad(test_hires_psf,
-                                   ((self.npad, self.npad), (self.npad,self.npad)),
-                                   mode='constant')
-
-        cx_padded = padded_test_hires_psf.shape[0] // 2 - 0.5
-
-        self.xcoord_psf = ((np.arange(padded_test_hires_psf.shape[0]) - cx_padded)
-                      * self.hires_pixscale_as)
-        
-        self.ycoord_psf = self.xcoord_psf.copy()
-
-        binned_test_psf, det_xcoord, det_ycoord = exoscene.image.resample_image_array(
-                padded_test_hires_psf, self.hires_pixscale_as,
-                img_xcoord = self.xcoord_psf, img_ycoord = self.xcoord_psf,
-                det_pixscale = self.data_pixscale_as,
-                det_width = self.max_detect_width,
-                binfac = 10, conserve = 'sum')
-
-        #print(f"\t{padded_test_hires_psf.shape}")
-        #print(f"\t{binned_test_psf.shape}")
-        
-        self.imwidth = binned_test_psf.shape[-1]
-        
         #print(f"\t{np.max(test_hires_psf), np.max(binned_test_psf),np.max(binned_test_psf) / np.max(test_hires_psf)}")
 
         # Check conservation of flux
         #print(f"\t{np.sum(test_hires_psf), np.sum(binned_test_psf)}")
         np.testing.assert_allclose(
-                np.sum(test_hires_psf),
-                np.sum(binned_test_psf), rtol=1e-4)
+                np.sum(hires_psf),
+                np.sum(binned_psf), rtol=1e-4)
         
         # Coordinate center
         np.testing.assert_almost_equal(0, det_xcoord[det_xcoord.shape[0]//2].value)
 
-        '''
-        # Plot the high-res & binned test
-        plt.figure(figsize=(14,5))
-        plt.subplot(121)
-        plt.imshow(test_hires_psf, origin='lower')
-        plt.colorbar()
-        plt.subplot(122)
-        plt.imshow(binned_test_psf, origin='lower')
-        plt.colorbar()   
-        plt.close()
-        '''
+        return binned_psf
+    
+    def load_target_psf_model(self,target,showplots=None):
+    
+        if showplots is None:
+            showplots = self.configs['showplots']
+        
+        ## Load CGI PSF model
+        hlc_psf_path =  pkg_resources.resource_filename('exoscene', 'data/cgi_hlc_psf')
+        psf_cube_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_oversampled.fits')
+        psf_r_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_radial_offsets.fits')
+        psf_angle_fname = os.path.join(hlc_psf_path, 'hlc_os11_psfs_azimuth_offsets.fits')
+        
+        psf_cube = fits.getdata(psf_cube_fname)
+        psf_hdr = fits.getheader(psf_cube_fname)
+        
+        # Save hires and data pixscale
+        self.hires_pixscale_as = psf_hdr['PIXAS'] * u.arcsec
+        hires_pixscale_LoD = psf_hdr['PIXLAMD']
+        data_scale_fac = np.round(self.hires_pixscale_as.value / self.data_pixscale_as.value,2)
+        self.data_pixscale_LoD = hires_pixscale_LoD / data_scale_fac
+        self.hires_scale_fac = np.round(1 / data_scale_fac,3)
+
+        # Save radial and angle offsets of PSF cube
+        r_offsets_LoD = fits.getdata(psf_r_fname)
+        self.r_offsets_as = r_offsets_LoD * self.hires_pixscale_as / hires_pixscale_LoD
+        self.angles = fits.getdata(psf_angle_fname)
+
+        # Save PSF cube and array center
+        self.offset_psfs = psf_cube
+        Np = self.offset_psfs.shape[-1]
+        self.cx = Np // 2 # Array center in zero-based indices
+
+        ## Set detector downsample parameters and test an example
+        self.npad = 8 # pad before and after array edge before binning if needed
+        test_hires_psf = exoscene.image.get_hires_psf_at_xy_os11(
+            self.offset_psfs,
+            self.r_offsets_as.value, self.angles,
+            self.hires_pixscale_as.value,
+            delx_as = (-0.1 * u.arcsec).value,
+            dely_as = (0.2 * u.arcsec).value)
+        binned_test_psf = self.downsample_hires_model(test_hires_psf)
+
+        if showplots:
+            # Plot the high-res & binned test
+            plt.figure(figsize=(14,5))
+            plt.subplot(121)
+            plt.imshow(test_hires_psf, origin='lower')
+            plt.colorbar()
+            plt.subplot(122)
+            plt.imshow(binned_test_psf, origin='lower')
+            plt.colorbar()   
+            plt.close()
+
 
         ## Estimate unocculted star count rate in peak pixel of PSF
+        # Get angle and separation of brightest PSF in the model cube
         (peak_ang_ind, peak_sep_ind, _, _) = np.unravel_index(
             np.argmax(self.offset_psfs), self.offset_psfs.shape)
         
-        #print("\n\tPeak angle index = {:d}, peak separation index = {:d}".format(peak_ang_ind, peak_sep_ind))
-
-        padded_peak_psf = np.pad(self.offset_psfs[peak_ang_ind, peak_sep_ind],
-                                 ((self.npad, self.npad), (self.npad,self.npad)),
-                                 mode='constant')
-
-        binned_peak_psf, _, _ = exoscene.image.resample_image_array(
-                padded_peak_psf, self.hires_pixscale_as,
-                img_xcoord = self.xcoord_psf, img_ycoord = self.xcoord_psf,
-                det_pixscale = self.data_pixscale_as,
-                det_width = self.max_detect_width,
-                binfac = 10, conserve = 'sum')
-
+        # Fetch and downsample the model PSF
+        binned_peak_psf = self.downsample_hires_model(self.offset_psfs[peak_ang_ind, peak_sep_ind])
+        
         ## Compute star PSF peak countrate based on collecting area and throughput
         minlam, maxlam = psf_hdr['LAM_C_NM'] * u.nanometer * np.array([0.95,1.05])
         
-        #print(f"Min lambda: {minlam}")
-        #print(f"Max lambda: {maxlam}")
+        print(f"Min lambda: {minlam}")
+        print(f"Max lambda: {maxlam}")
 
         self.star_flux = exoscene.star.bpgs_spectype_to_photonrate(spectype = target.planet_list[0].st_sptype,
                                                               Vmag = target.planet_list[0].st_Vmag,
                                                               minlam = minlam.value,
                                                               maxlam = maxlam.value)
-
         
         #print("\n\tBand-integrated irradiance of host star: {:.3E}".format(self.star_flux))
 
+        # Telescope primary mirror, and optical losses, may be updated, check source code for cgisim
         self.A_eff = 3.5786 * u.m**2
-        
         self.non_coron_optical_losses = 0.404 # Band 1 CBE at end-of-life
 
         #print(self.star_flux,binned_peak_psf,self.A_eff,self.non_coron_optical_losses)
@@ -228,7 +212,7 @@ class Observatory:
         
         #print('\n\tStellar PSF peak count rate = {:.2E}'.format(self.unocc_star_countrate_peakpix))
             
-        """
+        
         cw = 19
         fig = plt.figure(figsize=(8,6))
         plt.imshow(unocc_star_countrate_img.value)
@@ -236,9 +220,10 @@ class Observatory:
         plt.colorbar()
         plt.show()
         plt.close()
-        """
+        
 
         ## Define an approximation to the HLC field stop to mask out light from large angular separations
+        # TODO: Look for an actual mask array model, or updated radius
         fieldstop_rad = 9.0 # CGI HLC field stop radius in lam/D
         xs_p = np.arange(self.imwidth) - self.imwidth // 2
         ys_p = xs_p.copy()
@@ -248,13 +233,12 @@ class Observatory:
         
         self.datamask_nan = np.where(~(rrs_p >= fieldstop_rad / self.data_pixscale_LoD), 1, np.nan)
         
-        """
+        
         plt.figure()
         plt.imshow(self.datamask_nan)
         plt.colorbar()
         plt.show()
         plt.close()
-        """
         
     def simulate_observations(self,planet,showplots=None):
         """
@@ -292,25 +276,32 @@ class Observatory:
                 deltay_as = ephem_df['dec_mas'].iloc[t_ephem] / 1000
                 flux_ratio = ephem_df['fluxratio_575'].iloc[t_ephem]
 
-                # Get noiseless planet PSF at epochs, units: flux ratio
+                # Get noiseless planet PSF at epochs, units: normalized intensity
                 planet_psf = exoscene.image.get_hires_psf_at_xy_os11(
                          self.offset_psfs, self.r_offsets_as.value, self.angles,
-                         self.hires_pixscale_as.value, deltax_as, deltay_as, self.cx)
+                         self.hires_pixscale_as.value, deltax_as, deltay_as)
 
                 padded_planet_psf = np.pad(planet_psf, ((self.npad, self.npad), (self.npad,self.npad)), mode='constant')
 
                 # Get noiseless planet PSF at epochs, at detector resolution, units: flux ratio
-                binned_planet_psf, _, _ = exoscene.image.resample_image_array(
-                        img = padded_planet_psf, 
-                        img_pixscale = self.hires_pixscale_as, 
-                        img_xcoord = self.xcoord_psf, 
-                        img_ycoord = self.xcoord_psf,
-                        det_pixscale = self.data_pixscale_as,
-                        det_width = self.max_detect_width,
-                        binfac = 10, conserve = 'sum')
+                binned_planet_psf = self.downsample_hires_model(padded_planet_psf)
+                # binned_planet_psf, _, _ = exoscene.image.resample_image_array(
+                #         img = padded_planet_psf, 
+                #         img_pixscale = self.hires_pixscale_as, 
+                #         img_xcoord = self.xcoord_psf, 
+                #         img_ycoord = self.xcoord_psf,
+                #         det_pixscale = self.data_pixscale_as,
+                #         det_width = self.max_detect_width,
+                #         binfac = 10, conserve = 'sum')
                 
-                noiseless_scene = (binned_planet_psf * self.star_flux * flux_ratio
-                                            * self.A_eff * self.non_coron_optical_losses)
+                # TODO: how to use this exoscene function?
+                #       set coron_thrupt_peakpixel = 1 since throughput is encoded in model?
+                #       is optical loss double counted for noisy case?
+                noiseless_scene = exoscene.image.normintens_to_countrate(binned_planet_psf, self.star_flux, self.A_eff,
+                            coron_thrupt_peakpixel=1.0, optloss = self.non_coron_optical_losses,
+                            qe = 0.9) * flux_ratio
+                # noiseless_scene = (binned_planet_psf * self.star_flux * flux_ratio
+                #                             * self.A_eff * self.non_coron_optical_losses)
 
                 planet_scene_series[tt] += noiseless_scene
 
@@ -326,6 +317,8 @@ class Observatory:
 
                     noisy_scene,_ = exoscene.image.get_detector_exposure(
                         countrate_map = noiseless_scene/2, # /2 added to simulate photon - electron efficiency
+                        # TODO: find out what is included in the 0.5 factor - look for updated exposure time calculations (sergi's repo) 
+                        #       consider if we really care about accurate exposure times, or just goal SNR 
                         total_inttime = int_ts[tt], 
                         read_inttime = int_ts[tt],
                         dark_cur = 0 * u.photon/u.second, 
